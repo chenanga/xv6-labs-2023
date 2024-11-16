@@ -15,6 +15,7 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
+// 创建一个内核页表，并对重要的内存区域进行映射
 // Make a direct-map page table for the kernel.
 pagetable_t
 kvmmake(void)
@@ -24,27 +25,27 @@ kvmmake(void)
   kpgtbl = (pagetable_t) kalloc();
   memset(kpgtbl, 0, PGSIZE);
 
-  // uart registers
+  // uart registers    UART0: 映射 UART 寄存器，用于串口通信
   kvmmap(kpgtbl, UART0, UART0, PGSIZE, PTE_R | PTE_W);
 
-  // virtio mmio disk interface
+  // virtio mmio disk interface   VIRTIO0: 映射 VirtIO，用于磁盘接口。
   kvmmap(kpgtbl, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
 
-  // PLIC
+  // PLIC   PLIC: 映射中断控制器。  
   kvmmap(kpgtbl, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
 
-  // map kernel text executable and read-only.
+  // map kernel text executable and read-only.  内核代码段: 映射内核的代码段为只读和可执行。
   kvmmap(kpgtbl, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
 
-  // map kernel data and the physical RAM we'll make use of.
+  // map kernel data and the physical RAM we'll make use of.  内核数据段: 映射内核数据段为可读写
   kvmmap(kpgtbl, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
 
   // map the trampoline for trap entry/exit to
-  // the highest virtual address in the kernel.
+  // the highest virtual address in the kernel. TRAMPOLINE: 映射 trampoline 程序，用于陷入（trap）处理。
   kvmmap(kpgtbl, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
 
-  // allocate and map a kernel stack for each process.
-  proc_mapstacks(kpgtbl);
+  // allocate and map a kernel stack for each process. 进程栈: 为每个进程分配一个内核栈并映射。
+  proc_mapstacks(kpgtbl); 
   
   return kpgtbl;
 }
@@ -61,15 +62,19 @@ kvminit(void)
 void
 kvminithart()
 {
+  
   // wait for any previous writes to the page table memory to finish.
   sfence_vma();
 
+  // 配置硬件的页表寄存器 (satp) 指向 kernel_pagetable
   w_satp(MAKE_SATP(kernel_pagetable));
 
+  // 刷新 TLB（Translation Lookaside Buffer）。
   // flush stale entries from the TLB.
   sfence_vma();
 }
 
+// 据虚拟地址 va 查找或创建对应的页表条目
 // Return the address of the PTE in page table pagetable
 // that corresponds to virtual address va.  If alloc!=0,
 // create any required page-table pages.
@@ -162,7 +167,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
       return -1;
     if(*pte & PTE_V)
       panic("mappages: remap");
-    *pte = PA2PTE(pa) | perm | PTE_V;
+    *pte = PA2PTE(pa) | perm | PTE_V; // 填充该虚拟地址对应的物理地址和相关flag
     if(a == last)
       break;
     a += PGSIZE;
@@ -197,7 +202,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     *pte = 0;
   }
 }
-
+// 分配并初始化一个新的用户页表。
 // create an empty user page table.
 // returns 0 if out of memory.
 pagetable_t
@@ -211,6 +216,7 @@ uvmcreate()
   return pagetable;
 }
 
+// 将用户程序的初始化代码加载到虚拟地址 0 设置RWXU
 // Load the user initcode into address 0 of pagetable,
 // for the very first process.
 // sz must be less than a page.
@@ -227,6 +233,13 @@ uvmfirst(pagetable_t pagetable, uchar *src, uint sz)
   memmove(mem, src, sz);
 }
 
+/*
+  作用: 为用户进程分配内存，扩展地址空间。
+  逻辑:
+  将 oldsz 向上对齐到页面大小。
+  遍历分配页面，调用 kalloc 获取物理内存。
+  每分配一页，调用 mappages 完成映射。
+*/
 // Allocate PTEs and physical memory to grow process from oldsz to
 // newsz, which need not be page aligned.  Returns new size or 0 on error.
 uint64
@@ -255,6 +268,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
   return newsz;
 }
 
+// 放用户页表的所有页面和页表页。
 // Deallocate user pages to bring the process size from oldsz to
 // newsz.  oldsz and newsz need not be page-aligned, nor does newsz
 // need to be less than oldsz.  oldsz can be larger than the actual
@@ -352,6 +366,7 @@ uvmclear(pagetable_t pagetable, uint64 va)
   *pte &= ~PTE_U;
 }
 
+// 将数据从内核空间拷贝到用户虚拟地址
 // Copy from kernel to user.
 // Copy len bytes from src to virtual address dstva in a given page table.
 // Return 0 on success, -1 on error.

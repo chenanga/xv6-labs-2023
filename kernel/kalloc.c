@@ -26,10 +26,11 @@ struct {
 void
 kinit()
 {
-  initlock(&kmem.lock, "kmem");
-  freerange(end, (void*)PHYSTOP);
+  initlock(&kmem.lock, "kmem");  // 初始化自旋锁, 保护链表
+  freerange(end, (void*)PHYSTOP); // 将内核结束地址到物理内存顶部的区域标记为可用
 }
 
+// 将地址区间 [pa_start, pa_end) 分成页面，并将每个页面释放（标记为可用）。
 void
 freerange(void *pa_start, void *pa_end)
 {
@@ -52,7 +53,7 @@ kfree(void *pa)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
-  memset(pa, 1, PGSIZE);
+  memset(pa, 1, PGSIZE); // 填充为1, 以检测悬空引用问题
 
   r = (struct run*)pa;
 

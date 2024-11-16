@@ -335,6 +335,7 @@ typedef uint64 *pagetable_t; // 512 PTEs
 #define PGSIZE 4096 // bytes per page
 #define PGSHIFT 12  // bits of offset within a page
 
+// 向上和向下取整, 确保分配的内存大小为页面对齐的整数倍
 #define PGROUNDUP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1))
 #define PGROUNDDOWN(a) (((a)) & ~(PGSIZE-1))
 
@@ -344,11 +345,17 @@ typedef uint64 *pagetable_t; // 512 PTEs
 #define PTE_X (1L << 3)
 #define PTE_U (1L << 4) // user can access
 
+/*
+在 RISC-V 的页表结构中，PTE 的高位保存物理页面地址，低 10 位保存各种标志（例如 PTE_V、PTE_R、PTE_W 等）。
+页的大小是 4096 字节（2^12），因此物理地址的低 12 位总是 0，不需要存储。
+需要将物理地址的高位（除去低 12 位）右移 12 位，再左移 10 位对齐到 PTE 中的位置。
+*/
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
 
 #define PTE2PA(pte) (((pte) >> 10) << 12)
 
+// 提取 PTE 的低 10 位标志。
 #define PTE_FLAGS(pte) ((pte) & 0x3FF)
 
 // extract the three 9-bit page table indices from a virtual address.
