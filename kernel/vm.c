@@ -67,6 +67,7 @@ kvminithart()
   sfence_vma();
 
   // 配置硬件的页表寄存器 (satp) 指向 kernel_pagetable
+  // 在此之后，地址翻译开始生效
   w_satp(MAKE_SATP(kernel_pagetable));
 
   // 刷新 TLB（Translation Lookaside Buffer）。
