@@ -75,6 +75,40 @@ int
 sys_pgaccess(void)
 {
   // lab pgtbl: your code here.
+  uint64 va;
+  uint64 mask_addr;
+  int len;
+
+  argaddr(0, &va);
+  argint(1, &len);
+  argaddr(2, &mask_addr);
+
+  int mask = 0;
+  
+  if(va >= MAXVA)
+    return 0;
+
+  if (len > 64) {
+    len = 64;
+  }
+  
+  pte_t *pte;  
+  for (int i = 0; i < len; i++) {
+    pte = walk(myproc()->pagetable, va + i * PGSIZE, 0);
+    if (pte == 0)
+      return -1;
+
+    // 检查访问位 PTE_A 是否被设置
+    if (*pte & PTE_A) {
+      mask |= (1 << i);
+    }
+
+    // 手动清除 PTE_A 标志，硬件不会自动清除
+    *pte &= ~PTE_A;
+  }
+  if (copyout(myproc()->pagetable, mask_addr, (char *)&mask, sizeof(mask)) < 0)
+    return -1;
+
   return 0;
 }
 #endif
