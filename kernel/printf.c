@@ -125,6 +125,7 @@ panic(char *s)
   panicked = 1; // freeze uart output from other CPUs
   for(;;)
     ;
+  backtrace();
 }
 
 void
@@ -132,4 +133,24 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
+}
+
+void
+backtrace(void)
+{
+  uint64 fp = r_fp();
+  uint64 cur_fp = fp;
+  
+  printf("backtrace:\n");
+  while (PGROUNDDOWN(cur_fp) == PGROUNDDOWN(fp)) {
+    uint64 ra = cur_fp - 8;
+    printf("%p\n", *(uint64*)ra);
+    cur_fp = *(uint64*)(cur_fp - 16);
+  }
+  /*
+  读取fp的地址，从而得到ra的地址，解引用打印
+  再通过fp得到p-fp
+  */
+  // PGROUNDDOWN
+
 }
